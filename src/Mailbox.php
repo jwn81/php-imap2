@@ -303,7 +303,15 @@ class Mailbox
 
         $mailbox = empty($folderParts[1]) ? 'INBOX' : $folderParts[1];
 
-        $success = $client->append($mailbox, $message);
+        if($options!==null){
+            $myFlags = array();
+            foreach(explode(' ', $options) as $item){
+                $myFlags[] = str_replace('\\', '', $item);
+            }
+            $success = $client->append($mailbox, $message, $myFlags);
+        } else {
+            $success = $client->append($mailbox, $message);
+        }
 
         return boolval($success);
     }
