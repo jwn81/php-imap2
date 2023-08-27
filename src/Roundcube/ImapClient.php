@@ -439,7 +439,9 @@ class ImapClient
      */
     protected function closeSocket()
     {
-        @fclose($this->fp);
+        if(fclose($this->fp) === false){
+            throw new \yii\web\BadRequestHttpException('fclose/imap: Fehler');
+        }
         $this->fp = null;
     }
 
@@ -1177,7 +1179,10 @@ class ImapClient
     public function closeConnection()
     {
         if ($this->logged && $this->putLine($this->nextTag() . ' LOGOUT')) {
-            $this->readReply();
+            $my = $this->readReply();
+            if(!str_contains(strtolower($my), strtolower('OK LOGOUT'))){
+                throw new \yii\web\BadRequestHttpException('IMAP_LOGOUT ERR: ' . print_r([$my, $this], true));
+            }
         }
 
         $this->closeSocket();
@@ -3022,7 +3027,8 @@ class ImapClient
         unset($this->data['APPENDUID']);
 
         if ($mailbox === null || $mailbox === '') {
-            return false;
+            //return false;
+            throw new \yii\web\BadRequestHttpException('IMAP_append: no mailbox' . print_r([], true));
         }
 
         $binary       = $binary && $this->getCapability('BINARY');
@@ -3035,7 +3041,8 @@ class ImapClient
             if (is_resource($msg[$i])) {
                 $stat = fstat($msg[$i]);
                 if ($stat === false) {
-                    return false;
+                    throw new \yii\web\BadRequestHttpException('IMAP_append: no stat' . print_r([$msg], true));
+                    //return false;
                 }
                 $len += $stat['size'];
             }
@@ -3050,7 +3057,8 @@ class ImapClient
         }
 
         if (!$len) {
-            return false;
+            //return false;
+            throw new \yii\web\BadRequestHttpException('IMAP_append: no len' . print_r([], true));
         }
 
         // build APPEND command
@@ -3064,7 +3072,8 @@ class ImapClient
         // send APPEND command
         if (!$this->putLine($request)) {
             $this->setError(self::ERROR_COMMAND, "Failed to send APPEND command");
-            return false;
+            throw new \yii\web\BadRequestHttpException('IMAP_append: putline' . print_r([], true));
+            //return false;
         }
 
         // Do not wait when LITERAL+ is supported
@@ -3073,7 +3082,8 @@ class ImapClient
 
             if ($line[0] != '+') {
                 $this->parseResult($line, 'APPEND: ');
-                return false;
+                throw new \yii\web\BadRequestHttpException('IMAP_append: APPEND:' . print_r([$line], true));
+                //return false;
             }
         }
 
@@ -3096,14 +3106,17 @@ class ImapClient
                 for ($offset = 0; $offset < $size; $offset += $chunk_size) {
                     $chunk = substr($msg_part, $offset, $chunk_size);
                     if (!$this->putLine($chunk, false)) {
-                        return false;
+                        throw new \yii\web\BadRequestHttpException('IMAP_append: putLine' . print_r([$chunk], true));
+                        //return false;
                     }
                 }
             }
         }
 
+        
         if (!$this->putLine('')) { // \r\n
-            return false;
+            throw new \yii\web\BadRequestHttpException('IMAP_append: no putLine' . print_r([], true));
+            //return false;
         }
 
         do {
@@ -3114,7 +3127,9 @@ class ImapClient
         unset($this->data['STATUS:'.$mailbox]);
 
         if ($this->parseResult($line, 'APPEND: ') != self::ERROR_OK) {
-            return false;
+            //throw new \yii\web\BadRequestHttpException('IMAP_APPEND: bla3: ');
+            throw new \yii\web\BadRequestHttpException('IMAP_append: parseResults: ' . print_r([$line], true));
+            //return false;
         }
 
         if (!empty($this->data['APPENDUID'])) {
